@@ -1,5 +1,3 @@
-# ansible_get_started
-
 # Ставим ansible
 
 ```
@@ -9,17 +7,17 @@ pip install -U pip
 pip install ansible
 pip install ansible-modules-pm2
 ```
-# Расшифровываем зашифрованные файлы 
+# Расшифровываем файлы 
 
 ```
-ansible-vault --ask-vault-pass decrypt /path_to/group_vars/all.yml
-ansible-vault --ask-vault-pass decrypt /path_to/group_vars/omniwizard_project.yml
+ansible-vault decrypt /path_to/group_vars/all.yml
+ansible-vault  decrypt /path_to/group_vars/omniwizard_project.yml
 ```
 
 # Запуск плейбука
 
 ```
-ansible-playbook --ask-vault-pass playbook.yml
+ansible-playbook -i hosts --ask-vault-pass playbook.yml
 
 ```
 
