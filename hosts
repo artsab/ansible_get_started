@@ -1,0 +1,9 @@
+[all]
+first_omniwizard_host    ansible_ssh_host=1.2.3.4 ansible_python_interpreter=/usr/bin/python3
+second_omniwizard_host   ansible_ssh_host=1.2.3.5 ansible_python_interpreter=/usr/bin/python3
+firth_omniwizard_host    ansible_ssh_host=1.2.3.6 ansible_python_interpreter=/usr/bin/python3
+
+
+# Описываем какие хосты входят в omniwizard_project группу, проверь файлы с таким названием в group_vars и с названием all
+[omniwizard_project]
+first_omniwizard_host

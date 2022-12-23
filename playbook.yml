@@ -1,0 +1,86 @@
+- hosts: omniwizard_project
+  environment:
+    NVM_DIR: /var/local/nvm
+    PATH: "{{omniwizard_project_deploy_path}}/venv/bin:{{ ansible_env.PATH }}"
+  tasks:
+
+  # Для создания директоории могу потребоваться повышение привелегий,
+  # Не обязательно оформлять в блок. В блок оформляют когда несколько операций выполняется с повышенными привелегиями.
+  # Если операция разовая можно описать повышение привелегий на уровне одного плея
+  # https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_privilege_escalation.html
+  - block:
+    - name: "Ensure deploy directory exists"
+      file:
+        state: directory
+        path: "{{omniwizard_project_deploy_path}}"
+        mode: 0755
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"    
+
+    become: True
+    become_user: root
+# Вышли из блока с повышенными привелегиями
+# Тут работает от обычного ссх пользователя, под которым подключаемся
+# Описание модуля https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html
+  - name: "Pull omniwizard_project git repo from {{omniwizard_project_git_url}}"
+    ansible.builtin.git: 
+      repo: "https://{{ omniwizard_project_git_user | urlencode }}:{{ omniwizard_project_git_password | urlencode }}@{{omniwizard_project_git_url}}"
+      dest: "{{omniwizard_project_deploy_path}}"
+      version: "{{ omniwizard_project_git_branch }}"
+      force: true
+    notify:
+      - Update supervisor configurations
+      - Restart pm2 app
+
+  - name: "Install packages in virtualenv"    
+    pip:
+      requirements: "{{ omniwizard_project_deploy_path }}/src/requirements.txt"
+      state: present
+      virtualenv: "{{ omniwizard_project_deploy_path }}/venv"
+      extra_args: -U
+
+
+  - name: Run npm install
+    community.general.npm:
+      path: '{{ omniwizard_project_deploy_path }}'
+
+  - name: Build npm packages
+    ansible.builtin.command: npm  build
+    args:
+      chdir: '{{ omniwizard_project_deploy_path }}'
+    notify:
+      - Update supervisor configurations
+      - Restart pm2 app
+
+  - name: Run manage.py migrate command
+    command:
+      cmd: "{{ omniwizard_project_git_branch }}/venv/bin/python manage.py migrate"
+      chdir: "{{omniwizard_project_deploy_path}}/src"
+    environment:
+      DJANGO_SETTINGS_MODULE: 'omniwizard_project.settings.lego'
+
+  - name: Run manage.py collectstatic command
+    command:
+      cmd: "{{ omniwizard_project_git_branch }}/venvbin/python manage.py collectstatic -c --noinput"
+      chdir: "{{omniwizard_project_deploy_path}}/src"
+    environment:
+      DJANGO_SETTINGS_MODULE: 'omniwizard_project.settings.lego'
+    notify:
+      - Update supervisor configurations
+      - Restart pm2 app
+
+
+# Если состояние джобы предыдущей где упоминается notify - changed, то применяется указанный обработчик      
+  handlers:
+  
+    - name: Update supervisor configurations
+      supervisorctl:
+        name: 'omniwizard_project_supervisor_app_name'
+        state: restarted
+
+# https://github.com/10sr/ansible-modules-pm2
+    - name: Restart pm2 app
+      pm2:
+        name: "{{omniwizard_project_pm2_app_name}}"
+        config: "{{omniwizard_project_deploy_path}}/myapp.json"
+        state: restarted  
